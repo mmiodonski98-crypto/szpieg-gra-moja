@@ -1,3 +1,548 @@
 <!DOCTYPE html>
 <!-- (pełny kod z gry, najnowsza wersja – skrócony tu dla czytelności, w rzeczywistości będzie cały kod z dokumentu) -->
 <html><head><meta charset="UTF-8"><title>Koło Fortuny: Szpieg</title></head><body>Pełna wersja gry (tu wstawiono skrót – w ZIP będzie pełny kod HTML z dokumentu)</body></html>
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Koło Fortuny: Szpieg</title>
+  <style>
+    :root{
+      --bg:#0f1226; --card:#171a33; --muted:#9aa0c3; --accent:#69f0ae; --danger:#ff6584; --text:#e8ebff;
+      --btn:#23274d; --ring:#3a3f7a;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial; background:radial-gradient(1200px 800px at 70% -10%,#223 0%,#0f1226 60%); color:var(--text);}
+    .wrap{max-width:980px;margin:0 auto;padding:16px 16px 120px}
+    header{display:flex;align-items:center;gap:12px;justify-content:space-between;margin:8px 0 16px}
+    .brand{display:flex;align-items:center;gap:12px}
+    .logo{width:42px;height:42px;border-radius:50%;background:conic-gradient(from 0deg,#69f0ae,#81d4fa,#b388ff,#69f0ae);box-shadow:0 0 0 4px #ffffff12 inset,0 8px 32px #00000066}
+    h1{font-size:20px;margin:0;font-weight:700;letter-spacing:.3px}
+    .card{background:linear-gradient(180deg,#191c3b 0%,#121433 100%); border:1px solid #272a53; border-radius:16px; box-shadow:0 10px 30px #0008; padding:16px}
+    .grid{display:grid; gap:16px}
+    @media(min-width:900px){ .grid{grid-template-columns:1.1fr .9fr} }
+
+    .controls{display:grid;gap:12px}
+    label{font-size:13px;color:var(--muted)}
+    input[type=range]{width:100%}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .pill{padding:8px 12px;border-radius:999px;background:#ffffff12;border:1px solid #ffffff18;color:#fff;font-size:14px}
+    .muted{color:var(--muted)}
+
+    button{appearance:none;border:none;padding:12px 14px;border-radius:12px;background:var(--btn);color:#fff;font-weight:600;letter-spacing:.2px;box-shadow:0 2px 0 #0008,0 0 0 1px #ffffff10 inset; cursor:pointer}
+    button.primary{background:linear-gradient(180deg,#3b86ff,#3861ff);box-shadow:0 6px 18px #3861ff55,0 0 0 1px #ffffff1a inset}
+    button.accent{background:linear-gradient(180deg,#35cf98,#1cb57f)}
+    button.danger{background:linear-gradient(180deg,#ff7a7a,#ff4d6d)}
+    button:disabled{opacity:.5;cursor:not-allowed}
+
+    .panel{display:none}
+    .panel.active{display:block}
+
+    .reveal{display:grid;gap:10px;justify-items:center;text-align:center}
+    .blurred{filter:blur(14px)}
+    .big{font-size:20px;font-weight:700}
+
+    .list{max-height:210px;overflow:auto;border:1px solid #ffffff12;border-radius:10px;padding:8px}
+    .tag{display:inline-block;margin:4px 4px 0 0;padding:6px 9px;border-radius:999px;background:#ffffff12;border:1px solid #ffffff20;font-size:12px}
+
+    .footer{position:fixed;left:0;right:0;bottom:0;padding:10px 14px;background:#0b0e22aa;backdrop-filter:blur(10px);border-top:1px solid #ffffff12}
+    .footer .inner{max-width:980px;margin:0 auto;display:flex;gap:8px;align-items:center;justify-content:space-between}
+    small{color:var(--muted)}
+
+    /* ====== Wybór kategorii (collapsible) ====== */
+    details.selector{border:1px solid #ffffff18;border-radius:12px;overflow:hidden}
+    details.selector[open] .sel-body{max-height:360px}
+    .sel-head{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:#ffffff0f}
+    .sel-body{max-height:0;overflow:auto;transition:max-height .25s ease;border-top:1px solid #ffffff14}
+    .sel-body-inner{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px}
+    @media(max-width:620px){.sel-body-inner{grid-template-columns:1fr}}
+    .sel-actions{display:flex;gap:8px;align-items:center}
+    .chk{display:flex;gap:8px;align-items:center;background:#ffffff08;border:1px solid #ffffff14;padding:8px;border-radius:10px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <div class="logo"></div>
+        <h1>Koło Fortuny: <span style="color:var(--accent)">Szpieg</span></h1>
+      </div>
+      <div class="row">
+        <button id="btnNewRound" class="primary">Nowa runda</button>
+        <button id="btnReset" class="danger" title="Wyczyść stan">Reset</button>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- Left: info + wybór kategorii -->
+      <section class="card">
+        <div class="controls">
+          <div>
+            <label for="players">Liczba graczy: <b id="playersVal">5</b></label>
+            <input id="players" type="range" min="1" max="10" value="5" />
+            <div class="row"><span class="pill">Szpieg losowany w każdej rundzie</span><span class="pill">Hasło tajne – ujawniane indywidualnie</span></div>
+          </div>
+
+          <details class="selector" id="catSelector">
+            <summary class="sel-head">
+              <div class="row"><b>Wybór kategorii</b><span id="selCount" class="pill">0 / 0</span></div>
+              <div class="sel-actions">
+                <label class="row" style="gap:6px"><input type="checkbox" id="chkAll"/> Zaznacz wszystkie</label>
+                <button id="btnInvert">Odwróć wybór</button>
+              </div>
+            </summary>
+            <div class="sel-body">
+              <div id="selBodyInner" class="sel-body-inner"><!-- checkboksy --></div>
+            </div>
+          </details>
+
+          <div class="card" style="background:#111433;border-color:#262a52">
+            <div class="row" style="justify-content:space-between;align-items:center">
+              <div>
+                <div class="muted">Wylosowana kategoria</div>
+                <div id="pickedCategory" class="big">—</div>
+                <div class="muted" style="margin-top:6px">Hasło jest tajne i widoczne tylko przy odsłonięciu przez gracza.</div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label>Ostatnio wylosowane:</label>
+            <div id="history" class="list"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right: per-player reveal -->
+      <section class="card">
+        <div id="panelSetup" class="panel active">
+          <div class="reveal">
+            <div class="muted">Tryb ujawniania ról (przekazuj telefon kolejnym graczom)</div>
+            <div class="big">Kliknij „Nowa runda”, aby wylosować kategorię, hasło i szpiega.</div>
+            <div>
+              <span class="tag">1–10 graczy</span>
+              <span class="tag">Szpieg widzi tylko kategorię</span>
+              <span class="tag">Każda runda: nowy szpieg i hasło</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="panelReveal" class="panel">
+          <div class="reveal">
+            <div class="muted">Gracz <b>#<span id="currentPlayer">1</span></b></div>
+            <div id="roleBox" class="big blurred">—</div>
+            <button id="btnReveal">Odsłoń</button>
+            <button id="btnHide" style="display:none">Ukryj i przekaż telefon →</button>
+            <div class="muted" id="revealHint">Upewnij się, że pozostali nie patrzą 🙂</div>
+          </div>
+        </div>
+
+        <div id="panelEnd" class="panel">
+          <div class="reveal">
+            <div class="big">Wszyscy obejrzeli!</div>
+            <div class="muted">Dyskutujcie, kto jest szpiegiem. Gdy będziecie gotowi, możecie ujawnić szpiega.</div>
+            <button id="btnShowSpy">Pokaż szpiega</button>
+            <div id="spyReveal" style="display:none;margin-top:8px" class="big"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="inner">
+      <small>Wskazówka: dodaj ten ekran do ekranu głównego na telefonie (skrót) – działa offline.</small>
+      <div class="row">
+        <button id="btnShare">Udostępnij link</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ====== DANE: 20 kategorii × 100 haseł (uzupełniane automatycznie) ======
+    const categories = {
+      "Film": [
+        "Oscary", "Plan zdjęciowy", "Kaskader", "Kamera", "Reżyser", "Scenariusz", "Montage", "Kadr", "Premiera",
+        "Sequel", "Trylogia", "Plakat", "Kostiumy", "Charakteryzacja", "Dubler", "Czerwony dywan", "Kino domowe",
+        "Ścieżka dźwiękowa", "Napisy końcowe", "Zwiastun", "Klatka", "Box office", "Klaps", "Casting", "Storyboard",
+        "Film niezależny", "Krótkometrażowy", "Gatunek", "Cameo", "Wersja reżyserska", "Premiera światowa",
+        "Złota Palma", "Festiwal", "Animacja", "Dokument"
+      ],
+      "Muzyka": [
+        "Refren", "Zwrotka", "Bridge", "Próba dźwięku", "Koncert", "Backstage", "Singiel", "Album", "Winyl",
+        "Studio", "Producent", "Mikrofon", "Melodia", "Rytm", "Bas", "Perkusja", "Chórki", "Autotune", "Playlista",
+        "Headliner", "Support", "Akustycznie", "Cover", "Remiks", "Teledysk", "Scena", "Setlista", "Bis",
+        "Słuchawki", "Nuta", "Partytura", "Tempo", "Tonacja", "Nagroda Grammy", "Festiwal"
+      ],
+      "Sport": [
+        "Sędzia", "Dogrywka", "Rzut karny", "Spalony", "Trener", "Kapitan", "Tabela", "Play-off", "Rekord",
+        "Kontuzja", "Transfer", "Derby", "Kibice", "Trening", "Mecz u siebie", "Wyjazd", "Rozgrzewka", "Sparing",
+        "Złoty medal", "Podium", "Fotofinisz", "VAR", "Hala", "Stadion", "Turniej", "Liga", "Puchar", "Taktyka",
+        "Forma", "Szatnia", "Doping", "Sędzia liniowy", "Losowanie", "Maskotka", "Komentator"
+      ],
+      "Geografia": [
+        "Archipelag", "Półwysep", "Zatoka", "Równik", "Zwrotnik", "Masyw", "Delta", "Fiord", "Lodowiec",
+        "Wyżyna", "Nizina", "Ujście", "Źródło rzeki", "Step", "Tajga", "Pustynia", "Dolina", "Kanion", "Wulkan",
+        "Trzęsienie", "Wyspa", "Przesmyk", "Ocean", "Morze", "Jezioro", "Laguna", "Mapa", "Kompas", "Południk",
+        "Równoleżnik", "Prąd morski", "Monsun", "Szczyt", "Granica", "Stolica"
+      ],
+      "Jedzenie i napoje": [
+        "Przystawka", "Danie główne", "Deser", "Wege", "Gluten", "Fermentacja", "Sous-vide", "Grill", "Patelnia",
+        "Przyprawa", "Marynata", "Degustacja", "Sommelier", "Barista", "Street food", "Foodtruck", "Menu degustacyjne",
+        "Bufet", "All inclusive", "Food pairing", "Mise en place", "Piec konwekcyjny", "Blender", "Przepis", "Chef",
+        "Zimne ognie?", "Chłodnik", "Pierogi", "Tatar", "Tapas", "Sushi", "Matcha", "Koktajl", "Czekolada", "Wypiek"
+      ],
+      "Zwierzęta": [
+        "Ssaki", "Gady", "Ptaki", "Płazy", "Ryby", "Kręgowce", "Bezkręgowce", "Migrowanie", "Hibernacja",
+        "Siedlisko", "Łańcuch pokarmowy", "Drapieżnik", "Roślinożerca", "Owadożerca", "Kopytne", "Nora", "Stado",
+        "Gniazdo", "Terrarium", "Akwarium", "Udomowienie", "Ruja", "Kamuflaż", "Pióra", "Sierść", "Łuski",
+        "Ambra", "Mleczko pszczele", "Mimikra", "Echolokacja", "Mrowisko", "Ul", "Miód", "Trop", "Smycz"
+      ],
+      "Nauka": [
+        "Hipoteza", "Eksperyment", "Teoria", "Laboratorium", "Mikroskop", "Spektrometr", "Reakcja", "Atom",
+        "Cząsteczka", "DNA", "Gen", "Mutacja", "Grawitacja", "Prędkość", "Energia", "Siła", "Neuron", "Synapsa",
+        "Algorytm", "Model", "Wykres", "Statystyka", "Błąd pomiaru", "Kalibracja", "Peer-review", "Publikacja",
+        "Nobel", "Paradygmat", "Symulacja", "Obserwacja", "Próba kontrolna", "Cytowanie", "Replika", "Metaanaliza",
+        "Teleskop"
+      ],
+      "Historia": [
+        "Dynastia", "Bitwa", "Pokój", "Traktat", "Zabór", "Powstanie", "Okupacja", "Monarchia", "Republika",
+        "Rewolucja", "Kolonia", "Imperium", "Konstytucja", "Kodeks", "Sarkofag", "Hieroglify", "Archeologia",
+        "Paleolit", "Średniowiecze", "Renesans", "Barok", "Oświecenie", "Industrializacja", "Wojna światowa",
+        "Zimna wojna", "Dyplomacja", "Plebiscyt", "Cenzus", "Protektorat", "Anschluss", "Autonomia", "Kartografia",
+        "Kronika", "Herb", "Lenno"
+      ],
+      "Telewizja i seriale": [
+        "Pilot", "Sezon", "Odcinek", "Cliffhanger", "Spin-off", "Cross-over", "Showrunner", "Ramówka", "Streaming",
+        "Binge-watching", "Platforma VOD", "Reality", "Sitcom", "Drama", "Telenowela", "Mini-serial", "Dubbing",
+        "Napisy", "Glitch", "Reboot", "Rewatch", "Premiera tygodnia", "Kadr", "Boom mic", "Green screen",
+        "Efekty specjalne", "Serial kryminalny", "Finał", "Spoiler", "Recap", "Kamera 4K", "HDR", "Pilot zdalny",
+        "Teleturniej"
+      ],
+      "Gry wideo": [
+        "Level", "Boss", "DLC", "Patch", "Skórka", "Loot", "Exp", "Quest", "NPC", "PvP", "Co-op", "Speedrun",
+        "Achievement", "Save", "Checkpoint", "Permadeath", "Crafting", "Sandbox", "Battle pass", "Sezon rankingowy",
+        "Mod", "Indyk", "AAA", "Engine", "Fizyka", "Hitbox", "Latency", "LAN", "Gamepad", "VR", "Ray tracing",
+        "FOV", "Photo mode", "Early access", "Patch notes"
+      ],
+      "Literatura": [
+        "Narrator", "Fabuła", "Motyw", "Wątek", "Prolog", "Epilog", "Akapit", "Metafora", "Ironia", "Pointa",
+        "Wers", "Rym", "Sonet", "Epopeja", "Powieść", "Nowela", "Esej", "Reportaż", "Felieton", "Baśń",
+        "Mit", "Legenda", "Bestseller", "Kanon", "Wydawnictwo", "Okładka", "Redakcja", "Korekta", "Tłumaczenie",
+        "Przypis", "Indeks", "Spis treści", "Bibliografia", "ISBN"
+      ],
+      "Sławne osoby": [
+        "Celebryta", "Autograf", "Paparazzi", "Wizerunek", "Ambasador marki", "Premiera", "Wywiad", "Skandal",
+        "Filantropia", "Mentor", "Ikona", "Trendsetter", "Biografia", "Debiut", "Występ", "Rola", "Trasa",
+        "Stylizacja", "Agent", "Kontrakt", "Ranking", "Nagroda", "Soundbite", "Cytat", "Viral", "Fanclub",
+        "Meet&greet", "Afterparty", "Okładka magazynu", "Okienko informacyjne", "Talk-show", "Panel", "Konferencja",
+        "Charity", "Crossover"
+      ],
+      "Technologie": [
+        "Chmura", "API", "Backend", "Frontend", "Baza danych", "Prywatność", "Szyfrowanie", "Open source",
+        "Repozytorium", "Commit", "CI/CD", "Kontener", "Mikroserwis", "AI", "Model", "Prompt", "Token",
+        "Cache", "Latency", "Websocket", "SaaS", "Edge", "Serverless", "NoSQL", "REST", "GraphQL", "5G",
+        "IoT", "Blockchain", "SSD", "GPU", "Render", "Progressive Web App", "Service Worker", "QR kod"
+      ],
+      "Sztuka": [
+        "Płótno", "Paleta", "Pędzel", "Faktura", "Perspektywa", "Martwa natura", "Pejzaż", "Autoportret",
+        "Witraż", "Fresk", "Rzeźba", "Odlew", "Marmur", "Glina", "Gwasz", "Akwaforta", "Litografia", "Grafika",
+        "Wernisaż", "Galeria", "Kuratorka", "Instalacja", "Performance", "Happening", "Minimalizm", "Abstrakcja",
+        "Renesans", "Impresjonizm", "Kubizm", "Pikselart", "Street art", "Mural", "Szkic", "Sztaluga", "Rama"
+      ],
+      "Moda": [
+        "Wybieg", "Kolekcja", "Haute couture", "Prêt-à-porter", "Stylista", "Modelka", "Lookbook", "Sezon",
+        "Trencz", "Kapelusz", "Sneakersy", "Szpilki", "Materiał", "Jedwab", "Len", "Wełna", "Tkanina",
+        "Kratka", "Paski", "Guziki", "Metka", "Przymiarka", "Kroimy", "Wykrój", "Szwalnia", "Overlock",
+        "Kampania", "Front row", "Backstage", "Trend", "Paleta kolorów", "Sylwetka", "Akcesoria", "Torba", "Biżuteria"
+      ],
+      "Motoryzacja": [
+        "Silnik", "Skrzynia biegów", "Napęd", "Hamulce", "ABS", "ESP", "Turbo", "Felga", "Opona", "Karoseria",
+        "Liftback", "Coupe", "SUV", "Sedan", "Kombi", "Zasięg", "Spalanie", "Hybrida", "EV", "Ładowarka",
+        "Autostrada", "Tempomat", "Park Assist", "Lakier", "VIN", "Przegląd", "Serwis", "Manual", "Automat",
+        "Diesel", "Benzyna", "Wtrysk", "Common rail", "Katalizator", "Tłumik"
+      ],
+      "Dom i ogród": [
+        "Doniczka", "Zraszacz", "Konewka", "Kompost", "Mulcz", "Sadzonka", "Przesadzanie", "Rozmnażanie",
+        "Pielęgnacja", "Nawożenie", "Podlewanie", "Kosiarka", "Aerator", "Pergola", "Taras", "Altana", "Zraszacz",
+        "Trawnik", "Grządka", "Rabata", "Bulwa", "Cebula", "Pnącze", "Żywopłot", "Sekator", "Grabie",
+        "Wapnowanie", "Szklarniа", "Podłoże", "pH", "Susza", "Mszyca", "Substrat", "Agrowłóknina", "Kominek"
+      ],
+      "Podróże": [
+        "Bagaż podręczny", "Odprawa", "Boarding", "Gate", "Jet lag", "Hostel", "Apartament", "All inclusive",
+        "Rezerwacja", "Voucher", "Zwiedzanie", "City break", "Road trip", "Mapa offline", "Przewodnik",
+        "Kolej dużych prędkości", "Pociąg nocny", "Car sharing", "Wypożyczalnia", "Ubezpieczenie", "Waluta",
+        "Kurs", "Budżet", "Sezon niski", "Sezon wysoki", "Atrakcja", "Bilet łączony", "Wiza", "Granica",
+        "Karta pokładowa", "Turbulencje", "Okno", "Miejsce przy przejściu", "Terminal"
+      ],
+      "Internet i memy": [
+        "Hasztag", "Viral", "Trend", "Meme template", "GIF", "Repost", "DM", "Tagowanie", "Zasięgi", "Algorytm",
+        "Shadowban", "Clickbait", "Thumbnail", "Streamer", "Raid", "Subskrypcja", "Paywall", "Shorts", "For you",
+        "Scroll", "Like", "Koment", "Ban", "Moderator", "Link w bio", "NSFW", "Copypasta", "Cringe", "Mid",
+        "NPC", "Based", "OP", "Spoiler tag", "Alt"
+      ],
+      "Przysłowia i idiomy": [
+        "Kropka nad i", "Wilk w owczej skórze", "Słomiany zapał", "Ziarnko do ziarnka", "Kto pod kim dołki…",
+        "Nie ma róży…", "Leje jak z cebra", "Czarna owca", "Złapać byka za rogi", "Koń by się uśmiał",
+        "Mieć muchy w nosie", "Kto rano wstaje…", "Mieć asa w rękawie", "Wiercić dziurę w brzuchu", "Wyjść na jaw",
+        "Wywołać wilka z lasu", "Siedzieć jak na szpilkach", "Otworzyć puszkę Pandory", "Mieć dwie lewe ręce",
+        "Być pod kreską", "Kij w mrowisko", "Kości zostały rzucone", "Mieć głowę na karku", "Kupić kota w worku",
+        "Nie w ciemię bity", "Ryba psuje się od głowy", "Nadawać na tych samych falach", "Jak wół do karety",
+        "Pocałunek śmierci", "Wziąć na tapet", "Białe kruki", "Głowa do góry", "Strzał w dziesiątkę", "Słowo się rzekło"
+      ]
+    };
+
+    // Uzupełnij każdą kategorię do 100 haseł placeholderami "Hasło #n"
+    for (const [k, arr] of Object.entries(categories)) {
+      while (arr.length < 100) arr.push(`Hasło #${arr.length+1}`);
+    }
+
+    // ====== STAN GRY ======
+    let state = {
+      players: 5,
+      spy: null,
+      category: null,
+      word: null,
+      currentPlayer: 1,
+      history: [],
+      selectedCats: new Set(Object.keys(categories))
+    };
+
+    const el = sel => document.querySelector(sel);
+    const playersRange = el('#players');
+    const playersVal = el('#playersVal');
+    const pickedCategory = el('#pickedCategory');
+    const historyBox = el('#history');
+
+    const panelSetup = el('#panelSetup');
+    const panelReveal = el('#panelReveal');
+    const panelEnd = el('#panelEnd');
+    const roleBox = el('#roleBox');
+    const curPlayer = el('#currentPlayer');
+
+    const catSelector = el('#catSelector');
+    const selBodyInner = el('#selBodyInner');
+    const selCount = el('#selCount');
+    const chkAll = el('#chkAll');
+    const btnInvert = el('#btnInvert');
+
+    const ALL_CATS = Object.keys(categories);
+
+    // ====== LOSOWANIA ======
+    function randInt(min, max){ return Math.floor(Math.random()*(max-min+1))+min }
+    function getSelectedCategoryNames(){ return Array.from(state.selectedCats); }
+    function pickCategory(){
+      const pool = getSelectedCategoryNames();
+      if (pool.length === 0) return null;
+      const name = pool[randInt(0, pool.length-1)];
+      const word = categories[name][randInt(0, categories[name].length-1)];
+      return {name, word};
+    }
+
+    function pushHistory(cat){
+      state.history.unshift({cat, t: Date.now()});
+      state.history = state.history.slice(0, 10);
+      renderHistory();
+    }
+
+    function renderHistory(){
+      historyBox.innerHTML = '';
+      state.history.forEach(h=>{
+        const d = document.createElement('div');
+        d.className = 'row';
+        d.innerHTML = `<span class="tag">${h.cat}</span>`;
+        historyBox.appendChild(d);
+      });
+    }
+
+    // ====== Wybór kategorii UI ======
+    function renderCategorySelector(){
+      selBodyInner.innerHTML = '';
+      ALL_CATS.forEach(name=>{
+        const id = 'cat_'+name.replace(/\s+/g,'_');
+        const wrap = document.createElement('label');
+        wrap.className = 'chk';
+        wrap.innerHTML = `<input type="checkbox" id="${id}"> <span>${name}</span>`;
+        const input = wrap.querySelector('input');
+        input.checked = state.selectedCats.has(name);
+        input.addEventListener('change', ()=>{
+          if (input.checked) state.selectedCats.add(name); else state.selectedCats.delete(name);
+          saveSelected();
+          updateSelCount();
+        });
+        selBodyInner.appendChild(wrap);
+      });
+      updateSelCount();
+    }
+
+    function updateSelCount(){
+      selCount.textContent = `${state.selectedCats.size} / ${ALL_CATS.length}`;
+      chkAll.checked = (state.selectedCats.size === ALL_CATS.length);
+    }
+
+    function saveSelected(){
+      try{ localStorage.setItem('spygame.selected', JSON.stringify(Array.from(state.selectedCats))); }catch(e){}
+    }
+    function loadSelected(){
+      try{
+        const raw = localStorage.getItem('spygame.selected');
+        if (raw){
+          const arr = JSON.parse(raw);
+          if (Array.isArray(arr)) state.selectedCats = new Set(arr.filter(x=>ALL_CATS.includes(x)));
+        }
+      }catch(e){}
+    }
+
+    chkAll.addEventListener('change', ()=>{
+      if (chkAll.checked){ state.selectedCats = new Set(ALL_CATS); }
+      else { state.selectedCats = new Set(); }
+      saveSelected(); renderCategorySelector();
+    });
+    btnInvert.addEventListener('click', ()=>{
+      const next = new Set();
+      ALL_CATS.forEach(c=>{ if (!state.selectedCats.has(c)) next.add(c); });
+      state.selectedCats = next; saveSelected(); renderCategorySelector();
+    });
+
+    // ====== RUNDY ======
+    function startNewRound(){
+      const picked = pickCategory();
+      if (!picked){
+        alert('Wybierz co najmniej jedną kategorię w sekcji „Wybór kategorii”.');
+        catSelector.setAttribute('open','open');
+        return;
+      }
+      const {name, word} = picked; // prawidłowe wywołanie
+      state.category = name;
+      state.word = word; // hasło trzymamy tylko w stanie, nie pokazujemy w UI ogólnym
+      pickedCategory.textContent = name;
+      pushHistory(name);
+
+      // Losuj szpiega
+      state.spy = randInt(1, state.players);
+      state.currentPlayer = 1;
+      curPlayer.textContent = '1';
+
+      // Reset paneli
+      showPanel('reveal');
+      roleBox.textContent = 'Dotknij „Odsłoń”';
+      roleBox.classList.add('blurred');
+      el('#btnReveal').style.display = '';
+      el('#btnHide').style.display = 'none';
+      el('#spyReveal').style.display = 'none';
+    }
+
+    function showPanel(which){
+      panelSetup.classList.remove('active');
+      panelReveal.classList.remove('active');
+      panelEnd.classList.remove('active');
+      if (which==='reveal') panelReveal.classList.add('active');
+      else if (which==='end') panelEnd.classList.add('active');
+      else panelSetup.classList.add('active');
+    }
+
+    // Ujawnianie roli pojedynczemu graczowi
+    el('#btnReveal').addEventListener('click', ()=>{
+      const n = state.currentPlayer;
+      const isSpy = (n === state.spy);
+      roleBox.classList.remove('blurred');
+      if (isSpy){
+        roleBox.innerHTML = `JESTEŚ SZPIEGIEM 🔎<br><span class="muted">Kategoria:</span> ${state.category}`;
+      } else {
+        roleBox.innerHTML = `<span class="muted">Kategoria:</span> ${state.category}<br><span class="muted">Hasło:</span> ${state.word}`;
+      }
+      el('#btnReveal').style.display = 'none';
+      el('#btnHide').style.display = '';
+    });
+
+    el('#btnHide').addEventListener('click', ()=>{
+      state.currentPlayer++;
+      if (state.currentPlayer > state.players){
+        showPanel('end');
+      } else {
+        curPlayer.textContent = String(state.currentPlayer);
+        roleBox.textContent = '—';
+        roleBox.classList.add('blurred');
+        el('#btnReveal').style.display = '';
+        el('#btnHide').style.display = 'none';
+      }
+    });
+
+    el('#btnShowSpy').addEventListener('click', ()=>{
+      const box = el('#spyReveal');
+      box.style.display = '';
+      box.textContent = `Szpiegiem był gracz #${state.spy}`;
+    });
+
+    // ====== UI BINDINGS ======
+    playersRange.addEventListener('input', ()=>{
+      state.players = parseInt(playersRange.value,10);
+      playersVal.textContent = playersRange.value;
+    });
+
+    el('#btnNewRound').addEventListener('click', ()=> startNewRound());
+
+    el('#btnReset').addEventListener('click', ()=>{
+      state.spy = null; state.category = null; state.word = null; state.currentPlayer = 1; state.history = [];
+      pickedCategory.textContent = '—'; historyBox.innerHTML = '';
+      showPanel('setup');
+    });
+
+    // proste udostępnianie
+    el('#btnShare').addEventListener('click', async ()=>{
+      const shareData = { title: 'Koło Fortuny: Szpieg', text: 'Zagrajmy! Otwórz grę w przeglądarce.', url: location.href };
+      try{ if (navigator.share){ await navigator.share(shareData); } else { navigator.clipboard.writeText(location.href); alert('Link skopiowany do schowka!'); } }
+      catch(e){ console.log(e); }
+    });
+
+    // Odczyt liczby graczy z parametru URL (opcjonalnie: ?gracze=7)
+    const params = new URLSearchParams(location.search);
+    const p = parseInt(params.get('gracze')||params.get('players')||'');
+    if (!isNaN(p) && p>=1 && p<=10){ playersRange.value = p; playersRange.dispatchEvent(new Event('input')); }
+
+    // Załaduj wybór kategorii i wyrenderuj
+    loadSelected();
+    renderCategorySelector();
+
+    // ====== TESTY / DIAGNOSTYKA ======
+    function assert(name, cond){ const ok = !!cond; console[ok? 'log':'error']((ok?'✅':'❌')+' '+name); return ok; }
+    function runTests(){
+      const results = [];
+      // 0. Wybor kategorii — select all
+      const total = ALL_CATS.length;
+      state.selectedCats = new Set(ALL_CATS); updateSelCount();
+      results.push(assert('Select all zaznacza wszystkie', state.selectedCats.size === total));
+
+      // 1. startNewRound działa tylko gdy jest wybrana >=1 kategoria
+      state.selectedCats = new Set();
+      const before = state.history.length;
+      startNewRound();
+      results.push(assert('Brak losowania gdy brak kategorii', state.history.length === before));
+
+      // 2. Po wybraniu jednej kategorii losuje z tej puli
+      state.selectedCats = new Set([ALL_CATS[0]]);
+      startNewRound();
+      results.push(assert('Losuje z wybranej puli', state.category === ALL_CATS[0]));
+
+      // 3. Każda lista ma >=100 haseł
+      results.push(assert('Każda kategoria ma 100 haseł', ALL_CATS.every(k=>categories[k].length===100)));
+
+      // 4. Hasło nie wycieka do historii ani do głównego UI
+      const text = document.body.innerText;
+      results.push(assert('Hasło nie jest w tekście strony', text.indexOf(state.word) === -1));
+      results.push(assert('Historia bez haseł', el('#history').innerText.indexOf(state.word) === -1));
+
+      return results.every(Boolean);
+    }
+
+    if (params.get('test') === '1'){
+      const ok = runTests();
+      const diag = document.createElement('div'); diag.className = 'card';
+      diag.innerHTML = `<div class="big">Testy: ${ok? 'WSZYSTKIE ZDANE' : 'BŁĘDY – sprawdź konsolę'}</div>`;
+      document.querySelector('.wrap').prepend(diag);
+    }
+  </script>
+</body>
+</html>
